@@ -1,8 +1,9 @@
 name: Build App With Pake CLI
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "24"
   PNPM_VERSION: "10.26.2"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   workflow_dispatch:
@@ -16,38 +17,47 @@ on:
           - "windows-latest"
           - "macos-latest"
           - "ubuntu-24.04"
+
       url:
         description: "Website URL"
         required: true
+
       name:
         description: "App name (lowercase for Linux)"
         required: true
+
       icon:
         description: "Icon URL, auto-fetch if empty"
         required: false
+
       width:
         description: "Window width (px)"
         required: false
         default: "1200"
+
       height:
         description: "Window height (px)"
         required: false
         default: "780"
+
       fullscreen:
         description: "Start in fullscreen mode"
         required: false
         type: boolean
         default: false
+
       hide_title_bar:
         description: "Hide title bar (macOS only)"
         required: false
         type: boolean
         default: false
+
       multi_arch:
         description: "Universal binary (macOS only)"
         required: false
         type: boolean
         default: false
+
       targets:
         description: "Package formats (comma-separated: deb,appimage,rpm)"
         required: false
@@ -57,6 +67,7 @@ jobs:
   build:
     name: ${{ inputs.platform }}
     runs-on: ${{ inputs.platform }}
+
     strategy:
       fail-fast: false
 
@@ -82,7 +93,7 @@ jobs:
         uses: rui314/setup-mold@v1
 
       - name: Rust cache restore
-        uses: actions/cache/restore@v4.2.0
+        uses: actions/cache/restore@v5
         id: cache_store
         with:
           path: |
@@ -100,35 +111,18 @@ jobs:
         run: |
           ARGS=("${{ inputs.url }}" "--name" "${{ inputs.name }}")
 
-          if [ -n "${{ inputs.icon }}" ]; then
-            ARGS+=("--icon" "${{ inputs.icon }}")
-          fi
+          [ -n "${{ inputs.icon }}" ] && ARGS+=("--icon" "${{ inputs.icon }}")
+          [ -n "${{ inputs.width }}" ] && ARGS+=("--width" "${{ inputs.width }}")
+          [ -n "${{ inputs.height }}" ] && ARGS+=("--height" "${{ inputs.height }}")
 
-          if [ -n "${{ inputs.width }}" ]; then
-            ARGS+=("--width" "${{ inputs.width }}")
-          fi
-
-          if [ -n "${{ inputs.height }}" ]; then
-            ARGS+=("--height" "${{ inputs.height }}")
-          fi
-
-          if [ "${{ inputs.fullscreen }}" == "true" ]; then
-            ARGS+=("--fullscreen")
-          fi
-
-          if [ "${{ inputs.hide_title_bar }}" == "true" ]; then
-            ARGS+=("--hide-title-bar")
-          fi
-
-          if [ "${{ inputs.multi_arch }}" == "true" ]; then
-            ARGS+=("--multi-arch")
-          fi
+          [ "${{ inputs.fullscreen }}" == "true" ] && ARGS+=("--fullscreen")
+          [ "${{ inputs.hide_title_bar }}" == "true" ] && ARGS+=("--hide-title-bar")
+          [ "${{ inputs.multi_arch }}" == "true" ] && ARGS+=("--multi-arch")
 
           if [ -n "${{ inputs.targets }}" ] && [ "${{ runner.os }}" == "Linux" ]; then
             ARGS+=("--targets" "${{ inputs.targets }}")
           fi
 
-          echo "Running: node dist/cli.js ${ARGS[@]}"
           node dist/cli.js "${ARGS[@]}"
 
       - name: Build App (Windows)
@@ -158,7 +152,6 @@ jobs:
             $args += "--hide-title-bar"
           }
 
-          Write-Host "Running: node dist/cli.js $($args -join ' ')"
           node dist/cli.js $args
 
           git checkout -- src-tauri/Cargo.lock
@@ -198,8 +191,8 @@ jobs:
           retention-days: 3
 
       - name: Rust cache store
-        uses: actions/cache/save@v4.2.0
         if: steps.cache_store.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
         with:
           path: |
             ~/.cargo/bin/
